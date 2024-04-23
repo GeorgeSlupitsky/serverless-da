@@ -1,0 +1,5 @@
+.serverless
+/ReadFileLambda/node_modules/
+/SaveProductLambda/target/
+/GetAllProductsLambda/venv/
+/SaveProductLambda/.idea/

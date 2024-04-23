@@ -1,0 +1,81 @@
+org: yehorslupitskyi
+app: serverless-da
+service: serverless-da
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  region: eu-central-1
+  environment:
+    PRODUCTS_TABLE: !Ref ProductsTable
+  iamRoleStatements: 
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:*"
+      Resource: "*"
+    - Effect: "Allow"
+      Action:
+        - "s3:*"
+      Resource: "*"
+    - Effect: "Allow"
+      Action:
+        - "sqs:*"
+      Resource: "*"
+
+functions:
+  ReadFileLambda:
+    handler: ReadFileLambda/lambda/handler.handler
+    runtime: nodejs16.x 
+    memorySize: 512
+    timeout: 30
+    environment:
+      PRODUCTS_QUEUE: !Ref ProductsQueue
+    events:
+      - s3:
+          bucket: !Sub ${AWS::StackName}-${AWS::AccountId}-${AWS::Region}
+          event: s3:ObjectCreated:*
+          existing: true
+
+  GetAllProductsLambda:
+    handler: GetAllProductsLambda/lambda/handler.handler
+    runtime: python3.8 
+    memorySize: 512
+    timeout: 30
+    events:
+      - http:
+          path: products
+          method: get
+
+  SaveProductLambda:
+    package:
+      artifact: SaveProductLambda/target/save-product-lambda-1.0.jar 
+    handler: com.slupitskyi.serverless.SaveProductLambda::handler
+    runtime: java17
+    memorySize: 512
+    timeout: 30
+    events:
+      - http:
+          path: products
+          method: post 
+      - sqs:
+          arn: !GetAtt ProductsQueue.Arn
+
+resources:
+  Resources:
+    ProductsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+    ProductsQueue:
+      Type: AWS::SQS::Queue
+    ProductsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: !Sub ${AWS::StackName}-${AWS::AccountId}-${AWS::Region}
+  
